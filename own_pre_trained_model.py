@@ -26,8 +26,7 @@ import math
 from google.colab import drive
 drive.mount('/content/drive')
 
-from google.colab import files
-functions = files.upload()
+!wget 'https://raw.githubusercontent.com/DWalicki95/foams_microstructure/main/helper_functions.py' -O helper_functions.py
 
 from helper_functions import count_files_in_drive, create_dataset
 from helper_functions import count_init_transform_shape, print_random_image
@@ -210,7 +209,7 @@ class ContextPredictor(nn.Module):
                           kernel_size=3,
                           stride=2,
                           padding=1,
-                          output_padding=1), # Dodane output_padding
+                          output_padding=1),
         nn.ReLU(),
         nn.ConvTranspose2d(in_channels=hidden_units,
                           out_channels=hidden_units,
@@ -227,11 +226,11 @@ class ContextPredictor(nn.Module):
                           kernel_size=3,
                           stride=2,
                           padding=1,
-                          output_padding=1), # Dodane output_padding
+                          output_padding=1),
         nn.ReLU(),
         nn.ConvTranspose2d(in_channels=hidden_units,
                           out_channels=input_shape,
-                          kernel_size=3, # Zmienione na 3
+                          kernel_size=3,
                           stride=1,
                           padding=1)
     )
@@ -257,27 +256,6 @@ class ContextPredictor(nn.Module):
     # print(x.shape)
 
     return x
-
-# import torch.nn as nn
-
-# class ContextPredictor(nn.Module):
-#     def __init__(self, input_shape=1, hidden_units=16):
-#         super(ContextPredictor, self).__init__()
-#         self.encoder = nn.Sequential(
-#             nn.Conv2d(input_shape, hidden_units, kernel_size=3, stride=1, padding=1),
-#             nn.ReLU(),
-#             nn.MaxPool2d(2)
-#         )
-#         self.decoder = nn.Sequential(
-#             nn.ConvTranspose2d(hidden_units, hidden_units, kernel_size=3, stride=2, padding=1, output_padding=1),
-#             nn.ReLU(),
-#             nn.ConvTranspose2d(hidden_units, input_shape, kernel_size=3, stride=1, padding=1)
-#         )
-
-#     def forward(self, x):
-#         x = self.encoder(x)
-#         x = self.decoder(x)
-#         return x
 
 loss_fn = nn.MSELoss()
 n_splits=3
