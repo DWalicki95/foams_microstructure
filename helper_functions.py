@@ -29,8 +29,6 @@ from torch import nn
 import torchvision.models as models
 from torchvision.models import resnet50, ResNet50_Weights
 from torch.optim.lr_scheduler import StepLR
-import pytorch_ssim
-from pytorch_ssim import ssim
 
 def count_files_in_drive(folder_file_count: dict, zoom: int, DRIVE_PATH: str):
   '''Function that returns number of files in drive path'''
@@ -172,7 +170,6 @@ class CustomImageDataset(torch.utils.data.Dataset):
 def train_step(model: torch.nn.Module,
                train_dataloader: torch.utils.data.DataLoader,
                loss_fn: torch.nn.Module,
-               loss_ssim: bool,
                optimizer: torch.optim.Optimizer,
                device: torch.device):
   train_loss, train_metric = 0, 0
@@ -192,10 +189,7 @@ def train_step(model: torch.nn.Module,
     #Calculate loss
     # print(f'Wymiary y_pred: {y_pred.shape}')
     # print(f'Wymiary y: {y.shape}')
-    if loss_ssim:
-      loss = 1 - ssim(y_pred, y)
-    else:
-      loss = loss_fn(y_pred, y) #było y.squeeze()
+    loss = loss_fn(y_pred, y) #było y.squeeze()
     train_loss += loss.item()
 
     #Optimizer zero grad
