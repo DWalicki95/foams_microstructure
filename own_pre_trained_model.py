@@ -26,7 +26,8 @@ import math
 from google.colab import drive
 drive.mount('/content/drive')
 
-!wget 'https://raw.githubusercontent.com/DWalicki95/foams_microstructure/main/helper_functions.py' -O helper_functions.py
+# !wget 'https://raw.githubusercontent.com/DWalicki95/foams_microstructure/main/helper_functions.py' -O helper_functions.py
+## uncomment when neccessary
 
 from helper_functions import count_files_in_drive, create_dataset
 from helper_functions import count_init_transform_shape, print_random_image
@@ -38,7 +39,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu' #device agnostic code
 DRIVE_PATH = '/content/drive/MyDrive/Pianki'
 
 folder_file_count = {}
-zoom = 40 #different microscope maginification
+zoom = 40
 folder_file_count = count_files_in_drive(folder_file_count, zoom, DRIVE_PATH)
 
 folder_file_count = collections.OrderedDict(sorted(folder_file_count.items()))
@@ -50,7 +51,7 @@ sum(folder_file_count.values())
 data = pd.read_excel('/content/drive/MyDrive/Pianki/Dataset.xlsx', sheet_name='Arkusz2')
 data.drop('sample_index', axis=1, inplace=True)
 
-dataset = create_dataset('/content/drive/MyDrive/Pianki', data, '40%_tension') #it is commonly known that mechanical properties are related with microstructure, so here I've chosen 40%_tension BUT
+dataset = create_dataset('/content/drive/MyDrive/Pianki', 40, data, '40%_tension') #it is commonly known that mechanical properties are related with microstructure, so here I've chosen 40%_tension BUT
 # I've also tested SAG factor (resulting mechanical properties), pHRR and U600 (thermal properties)
 
 rand_img = print_random_image(dataset, return_rand_img=True)
@@ -92,14 +93,15 @@ def mask_img(image, mask_size=(2, 2), masked_places=1, seed=42, mask_return=Fals
     bottom = top + mask_size[0]
     right = left + mask_size[1]
 
-
+    # image.crop((left, top, right, bottom))
     draw = ImageDraw.Draw(masked_image)
     draw.rectangle([left, top, right, bottom], fill=0)
 
-  return masked_image
-
   if mask_return:
     return masked_image, (left, top, right, bottom)
+
+  else:
+    return masked_image
 
 data_transform = transforms.Compose([
     transforms.Lambda(cut_img),
@@ -149,10 +151,14 @@ data = CustomMaskedImageDataset(dataset['image_path'],
                                 transform=data_transform,
                                 mask_transform=data_mask_transform)
 
+# plt.imshow(data[3][0].squeeze(), cmap='gray');
+
 dataloader = DataLoader(dataset=data,
                         batch_size=32,
                         num_workers=1,
                         shuffle=True)
+
+# plt.imshow(next(iter(dataloader))[0][7].squeeze(), cmap='gray');
 
 class ContextPredictor(nn.Module):
   def __init__(self, input_shape, hidden_units):
@@ -257,66 +263,71 @@ class ContextPredictor(nn.Module):
 
     return x
 
-loss_fn = nn.MSELoss()
-n_splits=3
-kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-img_paths = list(dataset['image_path'])
-cv_results = {}
-split = 0 #param for saving results each corss-val step
-actual_best_result = 1 #param for best model choosing
+# loss_fn = nn.MSELoss()
+# n_splits=3
+# kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+# img_paths = list(dataset['image_path'])
+# cv_results = {}
+# split = 0 #param for saving results each corss-val step
+# actual_best_result = 1 #param for best model choosing
 
-for train_index, test_index in kfold.split(img_paths): #cross-validation
+# for train_index, test_index in kfold.split(img_paths): #cross-validation
 
-  model = ContextPredictor(input_shape=1, #model initialization
+#   model = ContextPredictor(input_shape=1, #model initialization
+#                          hidden_units=16)
+#   model.apply(model.initialize_weights_xavier) #xavier weights initialization
+
+#   train_paths = [img_paths[i] for i in train_index]
+#   val_images = math.ceil(len(train_paths) * 0.15)
+#   val_paths = train_paths[-val_images:]
+#   train_paths = train_paths[:-val_images]
+#   test_paths = [img_paths[i] for i in test_index]
+#   split += 1
+
+#   train_data = CustomMaskedImageDataset(paths=train_paths, transform=data_transform, mask_transform=data_mask_transform)
+#   val_data = CustomMaskedImageDataset(paths=val_paths, transform=data_transform, mask_transform=data_mask_transform)
+#   test_data = CustomMaskedImageDataset(paths=test_paths, transform=data_transform, mask_transform=data_mask_transform)
+
+#   train_dataloader = DataLoader(dataset=train_data,
+#                         batch_size=32,
+#                         num_workers=1,
+#                         shuffle=True)
+#   val_dataloader = DataLoader(dataset=val_data,
+#                               batch_size=32,
+#                               num_workers=1,
+#                               shuffle=False)
+#   test_dataloader = DataLoader(dataset=test_data,
+#                                batch_size=32,
+#                                num_workers=1,
+#                                shuffle=False)
+#   # sample_inputs, _ = next(iter(train_dataloader))
+#   # print(sample_inputs.shape)
+
+#   train_loss_list, val_loss_list, epoch_counter = train_and_test(model=model,
+#                  train_dataloader=train_dataloader,
+#                  val_dataloader=val_dataloader,
+#                  test_dataloader=test_dataloader,
+#                  loss_fn=loss_fn,
+#                  optimizer='Adam',
+#                  device=device,
+#                  save_model_name='inpainting_model',
+#                  learning_rate=0.001,
+#                  epochs=80)
+#   cv_results[f' Train loss: {split}'] = train_loss_list
+#   cv_results[f' Test loss: {split}'] = val_loss_list
+
+#   #choose and save best model
+#   best_result = np.min(val_loss_list)
+#   if best_result < actual_best_result:
+#     actual_best_result = best_result
+#     torch.save(model.state_dict(), f'_inpainting_model_step_{split}_min_test_loss_{actual_best_result}')
+
+# sample, _ = next(iter(test_dataloader))
+
+model = ContextPredictor(input_shape=1,
                          hidden_units=16)
-  model.apply(model.initialize_weights_xavier) #xavier weights initialization
-
-  train_paths = [img_paths[i] for i in train_index]
-  val_images = math.ceil(len(train_paths) * 0.15)
-  val_paths = train_paths[-val_images:]
-  train_paths = train_paths[:-val_images]
-  test_paths = [img_paths[i] for i in test_index]
-  split += 1
-
-  train_data = CustomMaskedImageDataset(paths=train_paths, transform=data_transform, mask_transform=data_mask_transform)
-  val_data = CustomMaskedImageDataset(paths=val_paths, transform=data_transform, mask_transform=data_mask_transform)
-  test_data = CustomMaskedImageDataset(paths=test_paths, transform=data_transform, mask_transform=data_mask_transform)
-
-  train_dataloader = DataLoader(dataset=train_data,
-                        batch_size=32,
-                        num_workers=1,
-                        shuffle=True)
-  val_dataloader = DataLoader(dataset=val_data,
-                              batch_size=32,
-                              num_workers=1,
-                              shuffle=False)
-  test_dataloader = DataLoader(dataset=test_data,
-                               batch_size=32,
-                               num_workers=1,
-                               shuffle=False)
-  # sample_inputs, _ = next(iter(train_dataloader))
-  # print(sample_inputs.shape)
-
-  train_loss_list, val_loss_list, epoch_counter = train_and_test(model=model,
-                 train_dataloader=train_dataloader,
-                 val_dataloader=val_dataloader,
-                 test_dataloader=test_dataloader,
-                 loss_fn=loss_fn,
-                 optimizer='Adam',
-                 device=device,
-                 save_model_name='inpainting_model',
-                 learning_rate=0.001,
-                 epochs=80)
-  cv_results[f' Train loss: {split}'] = train_loss_list
-  cv_results[f' Test loss: {split}'] = val_loss_list
-
-  #choose and save best model
-  best_result = np.min(val_loss_list)
-  if best_result < actual_best_result:
-    actual_best_result = best_result
-    torch.save(model.state_dict(), f'_inpainting_model_step_{split}_min_test_loss_{actual_best_result}')
-
-sample, _ = next(iter(test_dataloader))
+model.load_state_dict(torch.load('/content/_inpainting_model_step_2_min_test_loss_0.0009925866688718088'))
+model.to(device)
 
 model.eval()
 with torch.no_grad():
@@ -334,4 +345,5 @@ def show_predicted_mask(index: int = 0):
 
   plt.show()
 
-show_predicted_mask(20)
+show_predicted_mask(1)
+

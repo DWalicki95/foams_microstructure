@@ -396,6 +396,62 @@ def show_transformed_images(image_paths, transform, n=3, seed=42):
       ax[1].set_title(f'Transformed \nSize: {transformed_image_array.shape}')
       ax[1].axis('off')
 
+
+def plot_train_vs_pred(model: torch.nn.Module,
+                       test_dataloader: torch.utils.data.DataLoader,
+                       device: str):
+  model.eval()
+  model.to(device)
+  true_vals, pred_vals = [], []
+
+  with torch.inference_mode():
+    for X, y in test_dataloader:
+      X, y = X.to(device), y.to(device)
+      pred = model(X)
+
+      true_vals.append(y.detach().cpu().numpy())
+      pred_vals.append(pred.detach().cpu().numpy())
+
+  true_vals = np.concatenate(true_vals, axis=0)
+  pred_vals = np.concatenate(pred_vals, axis=0)
+
+  plt.figure(figsize=(10, 8))
+
+  plt.scatter(true_vals, pred_vals, alpha=0.5)
+  plt.xlabel('True values')
+  plt.ylabel('Predicted Values')
+  plt.title('True vs predicted values')
+
+  #perfect fit
+  min_val = min(min(true_vals), min(pred_vals))
+  max_val = max(max(true_vals), max(pred_vals))
+  plt.plot([min_val, max_val], [min_val, max_val], color='red')
+
+  plt.grid()
+  plt.show()
+
+
+def learning_curve(epoch: int,
+                   train_loss: float,
+                   test_loss: float):
+
+  plt.figure(figsize=(15, 7))
+
+
+  plt.subplot(1, 2, 1)
+  plt.plot(range(epoch), train_loss, label='train_loss')
+  plt.plot(range(epoch), test_loss, label='test_loss')
+  plt.title('Loss - original shape')
+  plt.xlabel('Epochs')
+  plt.legend()
+
+  plt.subplot(1, 2, 2)
+  plt.plot(range(2, epoch), train_loss[2:], label='train_loss')
+  plt.plot(range(2, epoch), test_loss[2:], label='test_loss')
+  plt.title(f'Loss - from epoch 2')
+  plt.xlabel('Epochs')
+  plt.legend()
+
 class SEMNet(nn.Module):
 
   def __init__(self, input_shape: int,
