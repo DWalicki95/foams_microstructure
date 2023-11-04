@@ -442,16 +442,16 @@ def show_predicted_mask(preds, sample, index: int = 0):
 
   '''
 
-plt.figure(figsize=(12, 6))
-plt.subplot(1, 2, 1)
-plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
-plt.title('Original image')
+  plt.figure(figsize=(12, 6))
+  plt.subplot(1, 2, 1)
+  plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
+  plt.title('Original image')
 
-plt.subplot(1, 2, 2)
-plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
-plt.title('Predicted mask')
+  plt.subplot(1, 2, 2)
+  plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
+  plt.title('Predicted mask')
 
-plt.show()
+  plt.show()
 
 
 def plot_train_vs_pred(model: torch.nn.Module,
