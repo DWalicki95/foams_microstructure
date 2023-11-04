@@ -30,9 +30,11 @@ drive.mount('/content/drive')
 ## uncomment when neccessary
 
 from helper_functions import count_files_in_drive, create_dataset
-from helper_functions import count_init_transform_shape, print_random_image
-from helper_functions import show_transformed_images
+from helper_functions import count_init_transform_shape, print_random_image, show_predicted_mask
+from helper_functions import show_transformed_images, cut_img, mask_img
 from helper_functions import train_step, test_step, train_and_test
+from models_architectures import ContextPredictor
+
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu' #device agnostic code
 
@@ -60,48 +62,10 @@ rand_img = print_random_image(dataset, return_rand_img=True)
 
 test_img = Image.open(dataset['image_path'][5])
 
-def cut_img(image, left=0, top=0, right=1280, bottom=960):
-  '''
-  Cutting image. Takes input:
-    * left = 'x' coordination
-    * right = left + img width
-    * top = 'y' coordination
-    * bottom = top + height
-  '''
-
-  return image.crop((left, top, right, bottom))
-
-im_crop = cut_img(test_img)
+im_crop = cut_img(test_img) #function from helper_functions
 
 resized_height, resized_width = count_init_transform_shape(im_crop.height, im_crop.width)
 resized_height, resized_width
-
-def mask_img(image, mask_size=(2, 2), masked_places=1, seed=42, mask_return=False):
-
-  '''
-  Mask random part of image.
-  '''
-
-  height, width = image.size
-  masked_image = image.copy()
-
-  for place in range(masked_places):
-
-    random.seed(seed)
-    top = np.random.randint(0, height - mask_size[0])
-    left = np.random.randint(0, width - mask_size[1])
-    bottom = top + mask_size[0]
-    right = left + mask_size[1]
-
-    # image.crop((left, top, right, bottom))
-    draw = ImageDraw.Draw(masked_image)
-    draw.rectangle([left, top, right, bottom], fill=0)
-
-  if mask_return:
-    return masked_image, (left, top, right, bottom)
-
-  else:
-    return masked_image
 
 data_transform = transforms.Compose([
     transforms.Lambda(cut_img),
@@ -160,190 +124,67 @@ dataloader = DataLoader(dataset=data,
 
 # plt.imshow(next(iter(dataloader))[0][7].squeeze(), cmap='gray');
 
-class ContextPredictor(nn.Module):
-  def __init__(self, input_shape, hidden_units):
-    super().__init__()
+#Training and evaluating model
+loss_fn = nn.MSELoss()
+n_splits=3
+kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+img_paths = list(dataset['image_path'])
+cv_results = {}
+split = 0 #param for saving results each corss-val step
+actual_best_result = 1 #param for best model choosing
 
-    #encoding layers
+for train_index, test_index in kfold.split(img_paths): #cross-validation
 
-    self.conv_block_1 = nn.Sequential(
-      nn.Conv2d(in_channels=input_shape,
-                    out_channels=hidden_units,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1),
-      nn.ReLU(),
-      nn.Conv2d(in_channels=hidden_units,
-                    out_channels=hidden_units,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1),
-      nn.ReLU(),
-      nn.Dropout(0.1),
-      nn.MaxPool2d(kernel_size=2,
-                      stride=2)
-      )
+  model = ContextPredictor(input_shape=1, #model initialization
+                         hidden_units=16)
+  model.apply(model.initialize_weights_xavier) #xavier weights initialization
 
-    self.conv_block_2 = nn.Sequential(
-      nn.Conv2d(in_channels=hidden_units,
-                    out_channels=hidden_units,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1),
-      nn.ReLU(),
-      nn.Conv2d(in_channels=hidden_units,
-                    out_channels=hidden_units,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1),
-      nn.ReLU(),
-      nn.Dropout(0.1),
-      nn.MaxPool2d(kernel_size=2,
-                      stride=2)
-      )
+  train_paths = [img_paths[i] for i in train_index]
+  val_images = math.ceil(len(train_paths) * 0.15)
+  val_paths = train_paths[-val_images:]
+  train_paths = train_paths[:-val_images]
+  test_paths = [img_paths[i] for i in test_index]
+  split += 1
 
-    self.encoder = nn.Sequential(
-      self.conv_block_1,
-      self.conv_block_2
-      )
+  train_data = CustomMaskedImageDataset(paths=train_paths, transform=data_transform, mask_transform=data_mask_transform)
+  val_data = CustomMaskedImageDataset(paths=val_paths, transform=data_transform, mask_transform=data_mask_transform)
+  test_data = CustomMaskedImageDataset(paths=test_paths, transform=data_transform, mask_transform=data_mask_transform)
 
-    #decoding layers
+  train_dataloader = DataLoader(dataset=train_data,
+                        batch_size=32,
+                        num_workers=1,
+                        shuffle=True)
+  val_dataloader = DataLoader(dataset=val_data,
+                              batch_size=32,
+                              num_workers=1,
+                              shuffle=False)
+  test_dataloader = DataLoader(dataset=test_data,
+                               batch_size=32,
+                               num_workers=1,
+                               shuffle=False)
+  # sample_inputs, _ = next(iter(train_dataloader))
+  # print(sample_inputs.shape)
 
-    self.deconv_block_1 = nn.Sequential(
-        nn.ConvTranspose2d(in_channels=hidden_units,
-                          out_channels=hidden_units,
-                          kernel_size=3,
-                          stride=2,
-                          padding=1,
-                          output_padding=1),
-        nn.ReLU(),
-        nn.ConvTranspose2d(in_channels=hidden_units,
-                          out_channels=hidden_units,
-                          kernel_size=3,
-                          stride=1,
-                          padding=1),
-        nn.ReLU(),
-        nn.Dropout(0.1)
-    )
+  train_loss_list, val_loss_list, epoch_counter = train_and_test(model=model,
+                 train_dataloader=train_dataloader,
+                 val_dataloader=val_dataloader,
+                 test_dataloader=test_dataloader,
+                 loss_fn=loss_fn,
+                 optimizer='Adam',
+                 device=device,
+                 save_model_name='inpainting_model',
+                 learning_rate=0.001,
+                 epochs=80)
+  cv_results[f' Train loss: {split}'] = train_loss_list
+  cv_results[f' Test loss: {split}'] = val_loss_list
 
-    self.deconv_block_2 = nn.Sequential(
-        nn.ConvTranspose2d(in_channels=hidden_units,
-                          out_channels=hidden_units,
-                          kernel_size=3,
-                          stride=2,
-                          padding=1,
-                          output_padding=1),
-        nn.ReLU(),
-        nn.ConvTranspose2d(in_channels=hidden_units,
-                          out_channels=input_shape,
-                          kernel_size=3,
-                          stride=1,
-                          padding=1)
-    )
-
-
-    self.decoder = nn.Sequential(
-      self.deconv_block_1,
-      self.deconv_block_2
-    )
-
-  @staticmethod #static function, not instanction method
-  def initialize_weights_xavier(m):
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-      nn.init.xavier_uniform_(m.weight)
-      if m.bias is not None: #if layer has a bias
-        nn.init.zeros_(m.bias) #set bias to 0
-
-
-  def forward(self, x):
-    x = self.encoder(x)
-    # print(x.shape)
-    x = self.decoder(x)
-    # print(x.shape)
-
-    return x
-
-# loss_fn = nn.MSELoss()
-# n_splits=3
-# kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-# img_paths = list(dataset['image_path'])
-# cv_results = {}
-# split = 0 #param for saving results each corss-val step
-# actual_best_result = 1 #param for best model choosing
-
-# for train_index, test_index in kfold.split(img_paths): #cross-validation
-
-#   model = ContextPredictor(input_shape=1, #model initialization
-#                          hidden_units=16)
-#   model.apply(model.initialize_weights_xavier) #xavier weights initialization
-
-#   train_paths = [img_paths[i] for i in train_index]
-#   val_images = math.ceil(len(train_paths) * 0.15)
-#   val_paths = train_paths[-val_images:]
-#   train_paths = train_paths[:-val_images]
-#   test_paths = [img_paths[i] for i in test_index]
-#   split += 1
-
-#   train_data = CustomMaskedImageDataset(paths=train_paths, transform=data_transform, mask_transform=data_mask_transform)
-#   val_data = CustomMaskedImageDataset(paths=val_paths, transform=data_transform, mask_transform=data_mask_transform)
-#   test_data = CustomMaskedImageDataset(paths=test_paths, transform=data_transform, mask_transform=data_mask_transform)
-
-#   train_dataloader = DataLoader(dataset=train_data,
-#                         batch_size=32,
-#                         num_workers=1,
-#                         shuffle=True)
-#   val_dataloader = DataLoader(dataset=val_data,
-#                               batch_size=32,
-#                               num_workers=1,
-#                               shuffle=False)
-#   test_dataloader = DataLoader(dataset=test_data,
-#                                batch_size=32,
-#                                num_workers=1,
-#                                shuffle=False)
-#   # sample_inputs, _ = next(iter(train_dataloader))
-#   # print(sample_inputs.shape)
-
-#   train_loss_list, val_loss_list, epoch_counter = train_and_test(model=model,
-#                  train_dataloader=train_dataloader,
-#                  val_dataloader=val_dataloader,
-#                  test_dataloader=test_dataloader,
-#                  loss_fn=loss_fn,
-#                  optimizer='Adam',
-#                  device=device,
-#                  save_model_name='inpainting_model',
-#                  learning_rate=0.001,
-#                  epochs=80)
-#   cv_results[f' Train loss: {split}'] = train_loss_list
-#   cv_results[f' Test loss: {split}'] = val_loss_list
-
-#   #choose and save best model
-#   best_result = np.min(val_loss_list)
-#   if best_result < actual_best_result:
-#     actual_best_result = best_result
-#     torch.save(model.state_dict(), f'_inpainting_model_step_{split}_min_test_loss_{actual_best_result}')
+  #choose and save best model
+  best_result = np.min(val_loss_list)
+  if best_result < actual_best_result:
+    actual_best_result = best_result
+    torch.save(model.state_dict(), f'_inpainting_model_step_{split}_min_test_loss_{actual_best_result}')
 
 # sample, _ = next(iter(test_dataloader))
-
-model = ContextPredictor(input_shape=1,
-                         hidden_units=16)
-model.load_state_dict(torch.load('/content/_inpainting_model_step_2_min_test_loss_0.0009925866688718088'))
-model.to(device)
-
-model.eval()
-with torch.no_grad():
-  preds = model(sample.to(device))
-
-def show_predicted_mask(index: int = 0):
-  plt.figure(figsize=(12, 6))
-  plt.subplot(1, 2, 1)
-  plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
-  plt.title('Original image')
-
-  plt.subplot(1, 2, 2)
-  plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
-  plt.title('Predicted mask')
-
-  plt.show()
 
 show_predicted_mask(1)
 

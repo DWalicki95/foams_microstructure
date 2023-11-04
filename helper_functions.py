@@ -48,6 +48,44 @@ def count_files_in_drive(folder_file_count: dict, zoom: int, DRIVE_PATH: str):
 
   return folder_file_count
 
+def cut_img(image, left=0, top=0, right=1280, bottom=960):
+  '''
+  Cutting image. Takes input:
+    * left = 'x' coordination
+    * right = left + img width
+    * top = 'y' coordination
+    * bottom = top + height
+  '''
+
+  return image.crop((left, top, right, bottom))
+
+def mask_img(image, mask_size=(2, 2), masked_places=1, seed=42, mask_return=False):
+
+  '''
+  Mask random part of image.
+  '''
+
+  height, width = image.size
+  masked_image = image.copy()
+
+  for place in range(masked_places):
+
+    random.seed(seed)
+    top = np.random.randint(0, height - mask_size[0])
+    left = np.random.randint(0, width - mask_size[1])
+    bottom = top + mask_size[0]
+    right = left + mask_size[1]
+
+    # image.crop((left, top, right, bottom))
+    draw = ImageDraw.Draw(masked_image)
+    draw.rectangle([left, top, right, bottom], fill=0)
+
+  if mask_return:
+    return masked_image, (left, top, right, bottom)
+
+  else:
+    return masked_image
+
 def create_dataset(PATH: str, zoom: int, data: pd.DataFrame, output_property: str):
   '''This function creates dataset - each sample with different magnifications is
       connected with chosen property'''
@@ -347,6 +385,7 @@ class CustomImageDataset_OwnNN(torch.utils.data.Dataset):
     label = torch.tensor(self.img_label.iloc[idx], dtype=torch.long)
     return image, label
 
+
 def count_images_mean_std(dataloader: torch.utils.data.DataLoader):
   '''
   This function returns means and standard deviation of images as array of pixels.
@@ -395,6 +434,24 @@ def show_transformed_images(image_paths, transform, n=3, seed=42):
       ax[1].imshow(transformed_image_array, cmap='gray')
       ax[1].set_title(f'Transformed \nSize: {transformed_image_array.shape}')
       ax[1].axis('off')
+
+  def show_predicted_mask(index: int = 0):
+    '''
+    Shows original image vs predicted one from ContextPredictor model.
+    :param: index: index of an image in batch. Choose to see different images
+
+    '''
+
+  plt.figure(figsize=(12, 6))
+  plt.subplot(1, 2, 1)
+  plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
+  plt.title('Original image')
+
+  plt.subplot(1, 2, 2)
+  plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
+  plt.title('Predicted mask')
+
+  plt.show()
 
 
 def plot_train_vs_pred(model: torch.nn.Module,
