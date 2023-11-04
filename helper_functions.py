@@ -435,23 +435,23 @@ def show_transformed_images(image_paths, transform, n=3, seed=42):
       ax[1].set_title(f'Transformed \nSize: {transformed_image_array.shape}')
       ax[1].axis('off')
 
-  def show_predicted_mask(index: int = 0):
-    '''
-    Shows original image vs predicted one from ContextPredictor model.
-    :param: index: index of an image in batch. Choose to see different images
+def show_predicted_mask(preds, sample, index: int = 0):
+  '''
+  Shows original image vs predicted one from ContextPredictor model.
+  :param: index: index of an image in batch. Choose to see different images
 
-    '''
+  '''
 
-  plt.figure(figsize=(12, 6))
-  plt.subplot(1, 2, 1)
-  plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
-  plt.title('Original image')
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.imshow(sample[index].permute(1, 2, 0).numpy(), cmap='gray')
+plt.title('Original image')
 
-  plt.subplot(1, 2, 2)
-  plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
-  plt.title('Predicted mask')
+plt.subplot(1, 2, 2)
+plt.imshow(preds[index].squeeze().cpu().numpy(), cmap='gray')
+plt.title('Predicted mask')
 
-  plt.show()
+plt.show()
 
 
 def plot_train_vs_pred(model: torch.nn.Module,
@@ -508,58 +508,3 @@ def learning_curve(epoch: int,
   plt.title(f'Loss - from epoch 2')
   plt.xlabel('Epochs')
   plt.legend()
-
-class SEMNet(nn.Module):
-
-  def __init__(self, input_shape: int,
-               hidden_units: int,
-               output_shape: int):
-    super().__init__()
-    self.conv_block_1 = nn.Sequential(
-        nn.Conv2d(in_channels=input_shape,
-                  out_channels=hidden_units,
-                  kernel_size=3,
-                  stride=1,
-                  padding=1),
-        nn.ReLU(),
-        nn.Conv2d(in_channels=hidden_units,
-                  out_channels=hidden_units,
-                  kernel_size=3,
-                  stride=1,
-                  padding=0),
-        nn.ReLU(),
-        nn.Dropout(0.1),
-        nn.MaxPool2d(kernel_size=2,
-                     stride=2)
-    )
-    self.conv_block_2 = nn.Sequential(
-        nn.Conv2d(in_channels=hidden_units,
-                  out_channels=hidden_units,
-                  kernel_size=3,
-                  stride=1,
-                  padding=0),
-        nn.ReLU(),
-        nn.Conv2d(in_channels=hidden_units,
-                  out_channels=hidden_units,
-                  kernel_size=3,
-                  stride=1,
-                  padding=0),
-        nn.ReLU(),
-        nn.Dropout(0.1),
-        nn.MaxPool2d(kernel_size=2,
-                     stride=2)
-    )
-    self.classifier = nn.Sequential(
-        nn.Flatten(),
-        nn.Linear(in_features=hidden_units*43*53,
-                  out_features=output_shape)
-    )
-
-  def forward(self, x):
-    x = self.conv_block_1(x)
-    print(x.shape)
-    x = self.conv_block_2(x)
-    print(x.shape)
-    x = self.classifier(x)
-    print(x.shape)
-    return x
