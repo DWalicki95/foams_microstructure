@@ -108,11 +108,12 @@ class ContextPredictor(nn.Module):
 
     return x
 
+
 class SEMNet(nn.Module):
 
-'''
-Model for prediction task.
-'''
+  '''
+  Model for prediction task.
+  '''
 
   def __init__(self, input_shape: int,
                hidden_units: int,
