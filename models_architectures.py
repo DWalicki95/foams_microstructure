@@ -2,10 +2,6 @@ from torch import nn
 
 class ContextPredictor(nn.Module):
 
-    '''
-    Encoder-decoder for recreating images.
-    '''
-
   def __init__(self, input_shape, hidden_units):
     super().__init__()
 
@@ -107,7 +103,6 @@ class ContextPredictor(nn.Module):
     # print(x.shape)
 
     return x
-
 
 class SEMNet(nn.Module):
 
