@@ -386,16 +386,22 @@ class CustomImageDataset_OwnNN(torch.utils.data.Dataset):
     return image, label
 
 class ModCustomImageDataset(CustomImageDataset):
-  def __init__(self, paths, transform=None):
+  def __init__(self, dataset, target, paths, transform=None):
     self.img_path = paths
+    self.dataset = dataset
+    self.target = target
     self.transform = transform
 
   def __len__(self):
     return len(self.img_path)
 
   def __getitem__(self, idx):
-    image, label = super().__getitem__(idx)
-    return image, sample
+    img_path = self.img_path[idx]
+    label = dataset[dataset[img_path] == img_paths][self.target].values
+    image = Image.open(img_path).convert('L')
+    if self.transform:
+      image = self.transform(image)
+    return image, label
 
 def count_images_mean_std(dataloader: torch.utils.data.DataLoader):
   '''
