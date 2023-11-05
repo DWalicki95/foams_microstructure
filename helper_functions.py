@@ -385,6 +385,17 @@ class CustomImageDataset_OwnNN(torch.utils.data.Dataset):
     label = torch.tensor(self.img_label.iloc[idx], dtype=torch.long)
     return image, label
 
+class ModCustomMaskedImageDataset(CustomImageDataset):
+  def __init__(self, paths, transform=None):
+    self.img_paths = paths
+    self.transform = transform
+
+  def __len__(self):
+    return len(self.img_paths)
+
+  def __getitem__(self, idx):
+    image, label = super().__getitem__(idx)
+    return image, sample
 
 def count_images_mean_std(dataloader: torch.utils.data.DataLoader):
   '''
