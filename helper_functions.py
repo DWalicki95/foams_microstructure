@@ -387,11 +387,11 @@ class CustomImageDataset_OwnNN(torch.utils.data.Dataset):
 
 class ModCustomImageDataset(CustomImageDataset):
   def __init__(self, paths, transform=None):
-    self.img_paths = paths
+    self.img_path = paths
     self.transform = transform
 
   def __len__(self):
-    return len(self.img_paths)
+    return len(self.img_path)
 
   def __getitem__(self, idx):
     image, label = super().__getitem__(idx)
