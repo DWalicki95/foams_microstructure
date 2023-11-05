@@ -385,7 +385,7 @@ class CustomImageDataset_OwnNN(torch.utils.data.Dataset):
     label = torch.tensor(self.img_label.iloc[idx], dtype=torch.long)
     return image, label
 
-class ModCustomMaskedImageDataset(CustomImageDataset):
+class ModCustomImageDataset(CustomImageDataset):
   def __init__(self, paths, transform=None):
     self.img_paths = paths
     self.transform = transform
